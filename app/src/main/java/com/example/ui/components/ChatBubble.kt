@@ -1,5 +1,7 @@
 package com.example.ui.components
 
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.os.Environment
@@ -67,6 +69,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
@@ -225,7 +228,7 @@ fun ChatBubble(
                     IconButton(
                         onClick = {
                             onCopyText(message.content)
-                            Toast.makeText(context, "Copied to clipboard", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, "Copied!", Toast.LENGTH_SHORT).show()
                         },
                         modifier = Modifier.size(32.dp)
                     ) {
@@ -414,6 +417,7 @@ fun FormattedMessageText(
     content: String,
     isUser: Boolean
 ) {
+    val context = LocalContext.current
     // Check if content contains code blocks ```
     if (content.contains("```")) {
         val parts = content.split("```")
@@ -444,6 +448,22 @@ fun FormattedMessageText(
                                 style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
                                 color = Color(0xFFCBA6F7)
                             )
+                            IconButton(
+                                onClick = {
+                                    val clipboardManager = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                    val clip = ClipData.newPlainText("Code Block", codeContent)
+                                    clipboardManager.setPrimaryClip(clip)
+                                    Toast.makeText(context, "Copied!", Toast.LENGTH_SHORT).show()
+                                },
+                                modifier = Modifier.size(24.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.ContentCopy,
+                                    contentDescription = "Copy code snippet",
+                                    tint = Color(0xFFCDD6F4),
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
                         }
                         Spacer(modifier = Modifier.height(6.dp))
                         Text(
@@ -462,7 +482,8 @@ fun FormattedMessageText(
                     Text(
                         text = part.trim(),
                         style = MaterialTheme.typography.bodyMedium.copy(lineHeight = 22.sp),
-                        color = if (isUser) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
+                        color = if (isUser) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.padding(start = 15.dp, top = 2.dp, bottom = 2.dp)
                     )
                 }
             }
@@ -471,7 +492,8 @@ fun FormattedMessageText(
         Text(
             text = content,
             style = MaterialTheme.typography.bodyMedium.copy(lineHeight = 22.sp),
-            color = if (isUser) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
+            color = if (isUser) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.padding(start = 15.dp, top = 2.dp, bottom = 2.dp)
         )
     }
 }

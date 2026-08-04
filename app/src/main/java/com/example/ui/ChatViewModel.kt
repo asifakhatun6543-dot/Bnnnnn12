@@ -269,7 +269,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
         val clip = ClipData.newPlainText("AI Message", text)
         clipboard.setPrimaryClip(clip)
-        Toast.makeText(context, "Copied to clipboard", Toast.LENGTH_SHORT).show()
+        Toast.makeText(context, "Copied!", Toast.LENGTH_SHORT).show()
     }
 
     fun clearNotice() {
