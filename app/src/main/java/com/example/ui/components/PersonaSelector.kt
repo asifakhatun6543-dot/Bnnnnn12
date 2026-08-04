@@ -74,7 +74,7 @@ fun PersonaSelector(
                         shape = CircleShape
                     )
                     .testTag("persona_selector_pill"),
-                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.8f)
+                color = Color.Transparent
             ) {
                 Box(
                     contentAlignment = Alignment.Center,

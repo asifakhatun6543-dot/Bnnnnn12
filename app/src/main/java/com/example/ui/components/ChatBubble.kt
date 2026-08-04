@@ -1,11 +1,21 @@
 package com.example.ui.components
 
 import android.content.Context
+import android.content.Intent
+import android.os.Environment
 import android.speech.tts.TextToSpeech
+import android.widget.Toast
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -25,14 +35,27 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.Flag
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.SmartToy
+import androidx.compose.material.icons.filled.ThumbDown
+import androidx.compose.material.icons.filled.ThumbUp
 import androidx.compose.material.icons.filled.VolumeUp
+import androidx.compose.material.icons.outlined.ThumbDown
+import androidx.compose.material.icons.outlined.ThumbUp
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -48,9 +71,11 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.model.ChatMessageEntity
+import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -84,51 +109,14 @@ fun ChatBubble(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .padding(vertical = 6.dp),
+            .padding(vertical = 4.dp),
         horizontalArrangement = if (isUser) Arrangement.End else Arrangement.Start,
         verticalAlignment = Alignment.Top
     ) {
-        if (!isUser) {
-            // Assistant Avatar
-            Box(
-                modifier = Modifier
-                    .size(36.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primaryContainer),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Default.SmartToy,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                    modifier = Modifier.size(20.dp)
-                )
-            }
-            Spacer(modifier = Modifier.width(10.dp))
-        }
-
         Column(
             horizontalAlignment = if (isUser) Alignment.End else Alignment.Start,
             modifier = Modifier.widthIn(max = 320.dp)
         ) {
-            // Sender Name and Time Label
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.padding(bottom = 4.dp)
-            ) {
-                Text(
-                    text = if (isUser) "You" else personaDisplayName,
-                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = SimpleDateFormat("hh:mm a", Locale.getDefault()).format(Date(message.timestamp)),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.outline
-                )
-            }
-
             // Message Bubble Box
             Surface(
                 shape = RoundedCornerShape(
@@ -150,64 +138,272 @@ fun ChatBubble(
                 }
             }
 
-            // Assistant Action Row (Copy, Speak, Version)
+            // Assistant Action Row (Copy, Like, Dislike, Download, Share, More options)
             if (!isUser && message.content.isNotBlank()) {
+                var isLiked by remember { mutableStateOf(false) }
+                var isDisliked by remember { mutableStateOf(false) }
+                var showMoreMenu by remember { mutableStateOf(false) }
+                var showDownloadDialog by remember { mutableStateOf(false) }
+
+                if (showDownloadDialog) {
+                    AlertDialog(
+                        onDismissRequest = { showDownloadDialog = false },
+                        title = {
+                            Text(
+                                text = "Download Response",
+                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
+                            )
+                        },
+                        text = {
+                            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                                Text(
+                                    text = "Select format to save response:",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Surface(
+                                    shape = RoundedCornerShape(10.dp),
+                                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .clickable {
+                                            showDownloadDialog = false
+                                            saveAsPdf(context, message.content)
+                                        }
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(14.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = "📄  Download as PDF (.pdf)",
+                                            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                                        )
+                                    }
+                                }
+                                Surface(
+                                    shape = RoundedCornerShape(10.dp),
+                                    color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.6f),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .clickable {
+                                            showDownloadDialog = false
+                                            saveAsTxt(context, message.content)
+                                        }
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(14.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = "📝  Download as Text (.txt)",
+                                            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                                            color = MaterialTheme.colorScheme.onSecondaryContainer
+                                        )
+                                    }
+                                }
+                            }
+                        },
+                        confirmButton = {},
+                        dismissButton = {
+                            TextButton(onClick = { showDownloadDialog = false }) {
+                                Text("Cancel")
+                            }
+                        }
+                    )
+                }
+
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.Start,
+                    horizontalArrangement = Arrangement.spacedBy(2.dp),
                     modifier = Modifier.padding(top = 4.dp)
                 ) {
+                    // 1. Copy Icon
                     IconButton(
-                        onClick = { onCopyText(message.content) },
-                        modifier = Modifier.size(28.dp)
+                        onClick = {
+                            onCopyText(message.content)
+                            Toast.makeText(context, "Copied to clipboard", Toast.LENGTH_SHORT).show()
+                        },
+                        modifier = Modifier.size(32.dp)
                     ) {
                         Icon(
                             imageVector = Icons.Default.ContentCopy,
                             contentDescription = "Copy message",
                             tint = MaterialTheme.colorScheme.outline,
-                            modifier = Modifier.size(16.dp)
+                            modifier = Modifier.size(17.dp)
                         )
                     }
 
+                    // 2. Like Button (Slidely hides when Disliked)
+                    AnimatedVisibility(
+                        visible = !isDisliked,
+                        enter = slideInHorizontally { -it } + fadeIn(),
+                        exit = slideOutHorizontally { -it } + fadeOut()
+                    ) {
+                        IconButton(
+                            onClick = {
+                                isLiked = !isLiked
+                                if (isLiked) isDisliked = false
+                                Toast.makeText(
+                                    context,
+                                    if (isLiked) "Thanks for your supporting" else "Removed feedback",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            },
+                            modifier = Modifier.size(32.dp)
+                        ) {
+                            Icon(
+                                imageVector = if (isLiked) Icons.Default.ThumbUp else Icons.Outlined.ThumbUp,
+                                contentDescription = "Like response",
+                                tint = if (isLiked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
+                                modifier = Modifier.size(17.dp)
+                            )
+                        }
+                    }
+
+                    // 3. Dislike Button (Slidely hides when Liked)
+                    AnimatedVisibility(
+                        visible = !isLiked,
+                        enter = slideInHorizontally { it } + fadeIn(),
+                        exit = slideOutHorizontally { it } + fadeOut()
+                    ) {
+                        IconButton(
+                            onClick = {
+                                isDisliked = !isDisliked
+                                if (isDisliked) isLiked = false
+                                Toast.makeText(
+                                    context,
+                                    if (isDisliked) "Feedback submitted" else "Removed feedback",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            },
+                            modifier = Modifier.size(32.dp)
+                        ) {
+                            Icon(
+                                imageVector = if (isDisliked) Icons.Default.ThumbDown else Icons.Outlined.ThumbDown,
+                                contentDescription = "Dislike response",
+                                tint = if (isDisliked) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.outline,
+                                modifier = Modifier.size(17.dp)
+                            )
+                        }
+                    }
+
+                    // 4. Download Icon
                     IconButton(
-                        onClick = {
-                            if (isSpeaking) {
-                                tts?.stop()
-                                isSpeaking = false
-                            } else {
-                                tts?.speak(message.content, TextToSpeech.QUEUE_FLUSH, null, "msg_tts")
-                                isSpeaking = true
-                            }
-                        },
-                        modifier = Modifier.size(28.dp)
+                        onClick = { showDownloadDialog = true },
+                        modifier = Modifier.size(32.dp)
                     ) {
                         Icon(
-                            imageVector = Icons.Default.VolumeUp,
-                            contentDescription = "Speak message",
-                            tint = if (isSpeaking) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
-                            modifier = Modifier.size(16.dp)
+                            imageVector = Icons.Default.Download,
+                            contentDescription = "Download response",
+                            tint = MaterialTheme.colorScheme.outline,
+                            modifier = Modifier.size(17.dp)
                         )
                     }
-                }
-            }
-        }
 
-        if (isUser) {
-            Spacer(modifier = Modifier.width(10.dp))
-            // User Avatar
-            Box(
-                modifier = Modifier
-                    .size(36.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primary),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Person,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onPrimary,
-                    modifier = Modifier.size(20.dp)
-                )
+                    // 5. Share Icon
+                    IconButton(
+                        onClick = {
+                            val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                                type = "text/plain"
+                                putExtra(Intent.EXTRA_TEXT, message.content)
+                            }
+                            context.startActivity(Intent.createChooser(shareIntent, "Share response"))
+                        },
+                        modifier = Modifier.size(32.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Share,
+                            contentDescription = "Share response",
+                            tint = MaterialTheme.colorScheme.outline,
+                            modifier = Modifier.size(17.dp)
+                        )
+                    }
+
+                    // 6. Three Vertical Dots (More options)
+                    Box {
+                        IconButton(
+                            onClick = { showMoreMenu = true },
+                            modifier = Modifier.size(32.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.MoreVert,
+                                contentDescription = "More options",
+                                tint = MaterialTheme.colorScheme.outline,
+                                modifier = Modifier.size(17.dp)
+                            )
+                        }
+
+                        val timeFormat = remember { SimpleDateFormat("h:mm a", Locale.getDefault()) }
+                        val timeString = remember(message.timestamp) {
+                            val msgTime = if (message.timestamp > 0) message.timestamp else System.currentTimeMillis()
+                            "Today, ${timeFormat.format(Date(msgTime))}"
+                        }
+
+                        DropdownMenu(
+                            expanded = showMoreMenu,
+                            onDismissRequest = { showMoreMenu = false }
+                        ) {
+                            // Header showing real-time timestamp like: Today, 2:00 PM
+                            Box(
+                                modifier = Modifier
+                                    .padding(horizontal = 16.dp, vertical = 8.dp)
+                            ) {
+                                Text(
+                                    text = timeString,
+                                    style = MaterialTheme.typography.labelMedium.copy(
+                                        fontWeight = FontWeight.SemiBold,
+                                        fontSize = 12.sp
+                                    ),
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+
+                            HorizontalDivider(modifier = Modifier.padding(bottom = 4.dp))
+
+                            // Option 1: Report Issue
+                            DropdownMenuItem(
+                                text = { Text("Report Issue") },
+                                leadingIcon = {
+                                    Icon(
+                                        imageVector = Icons.Default.Flag,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                },
+                                onClick = {
+                                    showMoreMenu = false
+                                    Toast.makeText(context, "Report submitted. Thank you!", Toast.LENGTH_SHORT).show()
+                                }
+                            )
+
+                            // Option 2: Read Aloud
+                            DropdownMenuItem(
+                                text = { Text(if (isSpeaking) "Stop Reading" else "Read Aloud") },
+                                leadingIcon = {
+                                    Icon(
+                                        imageVector = Icons.Default.VolumeUp,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                },
+                                onClick = {
+                                    showMoreMenu = false
+                                    if (isSpeaking) {
+                                        tts?.stop()
+                                        isSpeaking = false
+                                    } else {
+                                        tts?.speak(message.content, TextToSpeech.QUEUE_FLUSH, null, "msg_tts")
+                                        isSpeaking = true
+                                    }
+                                }
+                            )
+                        }
+                    }
+                }
             }
         }
     }
@@ -288,25 +484,10 @@ fun TypingIndicatorBubble(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .padding(vertical = 6.dp),
+            .padding(vertical = 4.dp),
         horizontalArrangement = Arrangement.Start,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Box(
-            modifier = Modifier
-                .size(36.dp)
-                .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.primaryContainer),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector = Icons.Default.AutoAwesome,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                modifier = Modifier.size(18.dp)
-            )
-        }
-        Spacer(modifier = Modifier.width(10.dp))
         Surface(
             shape = RoundedCornerShape(18.dp),
             color = MaterialTheme.colorScheme.surfaceVariant,
@@ -317,7 +498,7 @@ fun TypingIndicatorBubble(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "$personaDisplayName is thinking",
+                    text = "Thinking",
                     style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -360,5 +541,81 @@ fun DotAnimation() {
                     )
             )
         }
+    }
+}
+
+private fun saveAsPdf(context: Context, content: String) {
+    try {
+        val pdfDocument = android.graphics.pdf.PdfDocument()
+        val pageInfo = android.graphics.pdf.PdfDocument.PageInfo.Builder(595, 842, 1).create()
+        val page = pdfDocument.startPage(pageInfo)
+        val canvas = page.canvas
+
+        val titlePaint = android.text.TextPaint().apply {
+            color = android.graphics.Color.BLACK
+            textSize = 18f
+            isFakeBoldText = true
+            isAntiAlias = true
+        }
+        val metaPaint = android.text.TextPaint().apply {
+            color = android.graphics.Color.GRAY
+            textSize = 10f
+            isAntiAlias = true
+        }
+        val bodyPaint = android.text.TextPaint().apply {
+            color = android.graphics.Color.DKGRAY
+            textSize = 12f
+            isAntiAlias = true
+        }
+
+        canvas.drawText("AI Response Document", 40f, 50f, titlePaint)
+        val dateStr = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(Date())
+        canvas.drawText("Generated: $dateStr", 40f, 68f, metaPaint)
+        canvas.drawLine(40f, 78f, 555f, 78f, android.graphics.Paint().apply {
+            color = android.graphics.Color.LTGRAY
+            strokeWidth = 1f
+        })
+
+        val textWidth = 515
+        val staticLayout = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
+            android.text.StaticLayout.Builder.obtain(content, 0, content.length, bodyPaint, textWidth)
+                .setAlignment(android.text.Layout.Alignment.ALIGN_NORMAL)
+                .setLineSpacing(0f, 1.2f)
+                .build()
+        } else {
+            @Suppress("DEPRECATION")
+            android.text.StaticLayout(content, bodyPaint, textWidth, android.text.Layout.Alignment.ALIGN_NORMAL, 1.2f, 0f, false)
+        }
+
+        canvas.save()
+        canvas.translate(40f, 90f)
+        staticLayout.draw(canvas)
+        canvas.restore()
+
+        pdfDocument.finishPage(page)
+
+        val downloadsDir = context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
+            ?: context.filesDir
+        val file = File(downloadsDir, "AI_Response_${System.currentTimeMillis()}.pdf")
+        java.io.FileOutputStream(file).use { out ->
+            pdfDocument.writeTo(out)
+        }
+        pdfDocument.close()
+
+        Toast.makeText(context, "PDF saved: ${file.name}", Toast.LENGTH_LONG).show()
+    } catch (e: Exception) {
+        Toast.makeText(context, "Error saving PDF: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
+    }
+}
+
+private fun saveAsTxt(context: Context, content: String) {
+    try {
+        val downloadsDir = context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
+            ?: context.filesDir
+        val file = File(downloadsDir, "AI_Response_${System.currentTimeMillis()}.txt")
+        file.writeText(content)
+        Toast.makeText(context, "TXT saved: ${file.name}", Toast.LENGTH_LONG).show()
+    } catch (e: Exception) {
+        Toast.makeText(context, "Error saving TXT: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
     }
 }
