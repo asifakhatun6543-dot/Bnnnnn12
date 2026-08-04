@@ -8,6 +8,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -22,6 +23,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
@@ -39,14 +41,20 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AdminPanelSettings
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Code
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Lightbulb
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material.icons.filled.Send
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.SmartToy
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DrawerValue
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -73,8 +81,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -115,6 +129,7 @@ fun ChatScreen(
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     var inputText by remember { mutableStateOf("") }
+    var showTopMenu by remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
 
     // Handle User Notices in Snackbar
@@ -212,7 +227,74 @@ fun ChatScreen(
                                 )
                             }
                         },
-                        actions = {},
+                        actions = {
+                            // ChatGPT style New Chat icon
+                            IconButton(
+                                onClick = { viewModel.createNewSession() },
+                                modifier = Modifier.testTag("new_chat_button")
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Edit,
+                                    contentDescription = "New Chat"
+                                )
+                            }
+                            // Three vertical dots icon
+                            Box {
+                                IconButton(
+                                    onClick = { showTopMenu = true },
+                                    modifier = Modifier.testTag("top_more_options")
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.MoreVert,
+                                        contentDescription = "More Options"
+                                    )
+                                }
+                                DropdownMenu(
+                                    expanded = showTopMenu,
+                                    onDismissRequest = { showTopMenu = false }
+                                ) {
+                                    DropdownMenuItem(
+                                        text = { Text("New Chat") },
+                                        leadingIcon = {
+                                            Icon(
+                                                Icons.Default.Edit,
+                                                contentDescription = null
+                                            )
+                                        },
+                                        onClick = {
+                                            showTopMenu = false
+                                            viewModel.createNewSession()
+                                        }
+                                    )
+                                    DropdownMenuItem(
+                                        text = { Text("Chat History") },
+                                        leadingIcon = {
+                                            Icon(
+                                                Icons.Default.Menu,
+                                                contentDescription = null
+                                            )
+                                        },
+                                        onClick = {
+                                            showTopMenu = false
+                                            scope.launch { drawerState.open() }
+                                        }
+                                    )
+                                    DropdownMenuItem(
+                                        text = { Text("Settings & Personas") },
+                                        leadingIcon = {
+                                            Icon(
+                                                Icons.Default.Settings,
+                                                contentDescription = null
+                                            )
+                                        },
+                                        onClick = {
+                                            showTopMenu = false
+                                            viewModel.toggleAdminMode()
+                                        }
+                                    )
+                                }
+                            }
+                        },
                         colors = TopAppBarDefaults.topAppBarColors(
                             containerColor = Color.Transparent
                         )
@@ -226,8 +308,7 @@ fun ChatScreen(
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(top = innerPadding.calculateTopPadding())
-                        .navigationBarsPadding()
-                        .imePadding()
+                        .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom))
                 ) {
                     // Chat Messages Body or Empty State
                     Box(
@@ -402,6 +483,7 @@ fun EmptyChatState(
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun ChatInputBar(
     inputText: String,
@@ -414,11 +496,21 @@ fun ChatInputBar(
     onSelectPersona: (PersonaEntity) -> Unit,
     onOpenAdmin: () -> Unit
 ) {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 8.dp, vertical = 6.dp)
+    val keyboardController = LocalSoftwareKeyboardController.current
+    val focusManager = LocalFocusManager.current
+    val focusRequester = remember { FocusRequester() }
+    val isImeVisible = WindowInsets.isImeVisible
+    var isFocused by remember { mutableStateOf(false) }
+
+    androidx.compose.material3.Surface(
+        color = Color.Transparent,
+        modifier = Modifier.fillMaxWidth()
     ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 8.dp, vertical = 6.dp)
+        ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
@@ -433,13 +525,28 @@ fun ChatInputBar(
                 modifier = Modifier.padding(end = 6.dp)
             )
 
-            // Text Input Field (Middle)
+            // Text Input Field (Middle) with keyboard toggle on tap
             OutlinedTextField(
                 value = inputText,
                 onValueChange = onInputTextChange,
                 placeholder = { Text("Message...", fontSize = 13.sp) },
                 modifier = Modifier
                     .weight(1f)
+                    .focusRequester(focusRequester)
+                    .onFocusChanged { focusState ->
+                        isFocused = focusState.isFocused
+                    }
+                    .pointerInput(isImeVisible, isFocused) {
+                        detectTapGestures {
+                            if (isImeVisible || isFocused) {
+                                keyboardController?.hide()
+                                focusManager.clearFocus()
+                            } else {
+                                focusRequester.requestFocus()
+                                keyboardController?.show()
+                            }
+                        }
+                    }
                     .testTag("chat_input_field"),
                 shape = RoundedCornerShape(24.dp),
                 maxLines = 4,
@@ -498,6 +605,7 @@ fun ChatInputBar(
             }
         }
     }
+}
 }
 
 private fun String?.isNull_or_blank_custom(): Boolean = this == null || this.trim().isEmpty()
