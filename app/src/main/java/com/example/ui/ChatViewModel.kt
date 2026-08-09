@@ -182,6 +182,43 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun togglePinSession(sessionId: String, currentPin: Boolean) {
+        viewModelScope.launch {
+            repository.togglePinSession(sessionId, currentPin)
+            _userNotice.value = if (!currentPin) "Chat pinned to top" else "Chat unpinned"
+        }
+    }
+
+    fun renameSession(sessionId: String, newTitle: String) {
+        viewModelScope.launch {
+            if (newTitle.isNotBlank()) {
+                repository.renameSession(sessionId, newTitle.trim())
+                _userNotice.value = "Chat renamed"
+            }
+        }
+    }
+
+    fun downloadChatContext(context: Context) {
+        val msgs = currentMessages.value
+        if (msgs.isEmpty()) {
+            Toast.makeText(context, "No chat history to export", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val sb = StringBuilder()
+        val sessionTitle = allSessions.value.find { it.id == _selectedSessionId.value }?.title ?: "Chat"
+        sb.append("=== Chat Context Export: $sessionTitle ===\n\n")
+        msgs.forEach { m ->
+            val sender = if (m.role == "user") "USER" else "AI ASSISTANT"
+            sb.append("[$sender]:\n${m.content}\n\n")
+        }
+        val textToExport = sb.toString()
+
+        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        val clip = ClipData.newPlainText("Chat Context Export", textToExport)
+        clipboard.setPrimaryClip(clip)
+        Toast.makeText(context, "Chat context downloaded to clipboard!", Toast.LENGTH_LONG).show()
+    }
+
     fun sendMessage(userText: String) {
         if (userText.isBlank() || _isGenerating.value) return
 

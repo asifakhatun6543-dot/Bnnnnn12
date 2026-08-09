@@ -10,7 +10,7 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface ChatDao {
-    @Query("SELECT * FROM chat_sessions ORDER BY updatedAt DESC")
+    @Query("SELECT * FROM chat_sessions ORDER BY isPinned DESC, updatedAt DESC")
     fun getAllSessions(): Flow<List<ChatSessionEntity>>
 
     @Query("SELECT * FROM chat_sessions WHERE id = :sessionId LIMIT 1")
@@ -21,6 +21,9 @@ interface ChatDao {
 
     @Query("UPDATE chat_sessions SET title = :title, updatedAt = :updatedAt WHERE id = :sessionId")
     suspend fun updateSessionTitle(sessionId: String, title: String, updatedAt: Long = System.currentTimeMillis())
+
+    @Query("UPDATE chat_sessions SET isPinned = :isPinned WHERE id = :sessionId")
+    suspend fun updateSessionPin(sessionId: String, isPinned: Boolean)
 
     @Query("UPDATE chat_sessions SET personaId = :personaId, personaDisplayName = :personaName, updatedAt = :updatedAt WHERE id = :sessionId")
     suspend fun updateSessionPersona(sessionId: String, personaId: Long, personaName: String, updatedAt: Long = System.currentTimeMillis())

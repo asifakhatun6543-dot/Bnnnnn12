@@ -42,6 +42,7 @@ import androidx.compose.material.icons.filled.AdminPanelSettings
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Lightbulb
 import androidx.compose.material.icons.filled.Menu
@@ -75,11 +76,15 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.vector.path
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -101,6 +106,52 @@ import com.example.ui.components.PersonaSelector
 import com.example.ui.components.TypingIndicatorBubble
 import kotlinx.coroutines.launch
 import java.util.Locale
+
+private val EditSquareVector: ImageVector by lazy {
+    ImageVector.Builder(
+        name = "EditSquare",
+        defaultWidth = 24.dp,
+        defaultHeight = 24.dp,
+        viewportWidth = 24f,
+        viewportHeight = 24f
+    ).path(fill = SolidColor(Color.Black)) {
+        // Rounded box outline
+        moveTo(12f, 3f)
+        horizontalLineTo(7f)
+        curveTo(4.79f, 3f, 3f, 4.79f, 3f, 7f)
+        verticalLineTo(17f)
+        curveTo(3f, 19.21f, 4.79f, 21f, 7f, 21f)
+        horizontalLineTo(17f)
+        curveTo(19.21f, 21f, 21f, 19.21f, 21f, 17f)
+        verticalLineTo(12f)
+        horizontalLineTo(19f)
+        verticalLineTo(17f)
+        curveTo(19f, 18.1f, 18.1f, 19f, 17f, 19f)
+        horizontalLineTo(7f)
+        curveTo(5.9f, 19f, 5f, 18.1f, 5f, 17f)
+        verticalLineTo(7f)
+        curveTo(5f, 5.9f, 5.9f, 5f, 7f, 5f)
+        horizontalLineTo(12f)
+        verticalLineTo(3f)
+        close()
+
+        // Diagonal pencil inside box
+        moveTo(20.71f, 5.04f)
+        curveTo(21.1f, 4.65f, 21.1f, 4.02f, 20.71f, 3.63f)
+        lineTo(19.37f, 2.29f)
+        curveTo(18.98f, 1.9f, 18.35f, 1.9f, 17.96f, 2.29f)
+        lineTo(9f, 11.25f)
+        verticalLineTo(15f)
+        horizontalLineTo(12.75f)
+        lineTo(20.71f, 5.04f)
+        close()
+        moveTo(10.5f, 13.5f)
+        horizontalLineTo(10.5f)
+        lineTo(17.25f, 6.75f)
+        lineTo(17.25f, 6.75f)
+        close()
+    }.build()
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -128,6 +179,8 @@ fun ChatScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
+    val focusManager = LocalFocusManager.current
+    val keyboardController = LocalSoftwareKeyboardController.current
     var inputText by remember { mutableStateOf("") }
     var showTopMenu by remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
@@ -185,10 +238,18 @@ fun ChatScreen(
             onSubmitReport = viewModel::submitReport
         )
     } else {
+        val isDrawerOpen = drawerState.isOpen || drawerState.isAnimationRunning
+
         ModalNavigationDrawer(
             drawerState = drawerState,
+            scrimColor = Color.Black.copy(alpha = 0.40f),
             drawerContent = {
-                ModalDrawerSheet {
+                ModalDrawerSheet(
+                    drawerContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.88f),
+                    drawerContentColor = MaterialTheme.colorScheme.onSurface,
+                    drawerShape = RoundedCornerShape(topEnd = 24.dp, bottomEnd = 24.dp),
+                    modifier = Modifier.width(310.dp)
+                ) {
                     ChatDrawerContent(
                         sessions = sessions,
                         selectedSessionId = selectedSessionId,
@@ -203,6 +264,8 @@ fun ChatScreen(
                             scope.launch { drawerState.close() }
                         },
                         onDeleteSession = viewModel::deleteSession,
+                        onTogglePinSession = viewModel::togglePinSession,
+                        onRenameSession = viewModel::renameSession,
                         onOpenProfileSettings = {
                             viewModel.openProfileSettings()
                             scope.launch { drawerState.close() }
@@ -212,86 +275,143 @@ fun ChatScreen(
                 }
             }
         ) {
-            Scaffold(
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .then(
+                        if (isDrawerOpen) {
+                            Modifier.blur(10.dp)
+                        } else {
+                            Modifier
+                        }
+                    )
+            ) {
+                Scaffold(
                 topBar = {
                     TopAppBar(
                         title = {},
                         navigationIcon = {
-                            IconButton(
-                                onClick = { scope.launch { drawerState.open() } },
-                                modifier = Modifier.testTag("drawer_toggle_button")
+                            Surface(
+                                shape = CircleShape,
+                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.8f),
+                                modifier = Modifier.padding(start = 12.dp)
                             ) {
-                                Icon(
-                                    imageVector = Icons.Default.Menu,
-                                    contentDescription = "Open Chat History Drawer"
-                                )
+                                IconButton(
+                                    onClick = {
+                                        focusManager.clearFocus()
+                                        scope.launch { drawerState.open() }
+                                    },
+                                    modifier = Modifier.testTag("drawer_toggle_button")
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Menu,
+                                        contentDescription = "Open Chat History Drawer",
+                                        tint = MaterialTheme.colorScheme.onSurface
+                                    )
+                                }
                             }
                         },
                         actions = {
-                            // ChatGPT style New Chat icon
-                            IconButton(
-                                onClick = { viewModel.createNewSession() },
-                                modifier = Modifier.testTag("new_chat_button")
+                            Surface(
+                                shape = CircleShape,
+                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.8f),
+                                modifier = Modifier.padding(end = 12.dp)
                             ) {
-                                Icon(
-                                    imageVector = Icons.Default.Edit,
-                                    contentDescription = "New Chat"
-                                )
-                            }
-                            // Three vertical dots icon
-                            Box {
-                                IconButton(
-                                    onClick = { showTopMenu = true },
-                                    modifier = Modifier.testTag("top_more_options")
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
                                 ) {
-                                    Icon(
-                                        imageVector = Icons.Default.MoreVert,
-                                        contentDescription = "More Options"
-                                    )
-                                }
-                                DropdownMenu(
-                                    expanded = showTopMenu,
-                                    onDismissRequest = { showTopMenu = false }
-                                ) {
-                                    DropdownMenuItem(
-                                        text = { Text("New Chat") },
-                                        leadingIcon = {
-                                            Icon(
-                                                Icons.Default.Edit,
-                                                contentDescription = null
-                                            )
-                                        },
+                                     // ChatGPT style New Chat icon
+                                    IconButton(
                                         onClick = {
-                                            showTopMenu = false
+                                            focusManager.clearFocus()
                                             viewModel.createNewSession()
-                                        }
-                                    )
-                                    DropdownMenuItem(
-                                        text = { Text("Chat History") },
-                                        leadingIcon = {
-                                            Icon(
-                                                Icons.Default.Menu,
-                                                contentDescription = null
-                                            )
                                         },
-                                        onClick = {
-                                            showTopMenu = false
-                                            scope.launch { drawerState.open() }
-                                        }
-                                    )
-                                    DropdownMenuItem(
-                                        text = { Text("Settings & Personas") },
-                                        leadingIcon = {
+                                        modifier = Modifier.testTag("new_chat_button")
+                                    ) {
+                                        Icon(
+                                            imageVector = EditSquareVector,
+                                            contentDescription = "New Chat",
+                                            tint = MaterialTheme.colorScheme.onSurface
+                                        )
+                                    }
+                                    // Three vertical dots icon
+                                    Box {
+                                        IconButton(
+                                            onClick = {
+                                                focusManager.clearFocus()
+                                                showTopMenu = true
+                                            },
+                                            modifier = Modifier.testTag("top_more_options")
+                                        ) {
                                             Icon(
-                                                Icons.Default.Settings,
-                                                contentDescription = null
+                                                imageVector = Icons.Default.MoreVert,
+                                                contentDescription = "More Options",
+                                                tint = MaterialTheme.colorScheme.onSurface
                                             )
-                                        },
-                                        onClick = {
-                                            showTopMenu = false
-                                            viewModel.toggleAdminMode()
                                         }
-                                    )
+                                        DropdownMenu(
+                                            expanded = showTopMenu,
+                                            onDismissRequest = { showTopMenu = false }
+                                        ) {
+                                            DropdownMenuItem(
+                                                text = { Text("New Chat") },
+                                                leadingIcon = {
+                                                    Icon(
+                                                        Icons.Default.Edit,
+                                                        contentDescription = null
+                                                    )
+                                                },
+                                                onClick = {
+                                                    focusManager.clearFocus()
+                                                    showTopMenu = false
+                                                    viewModel.createNewSession()
+                                                }
+                                            )
+                                            DropdownMenuItem(
+                                                text = { Text("Chat History") },
+                                                leadingIcon = {
+                                                    Icon(
+                                                        Icons.Default.Menu,
+                                                        contentDescription = null
+                                                    )
+                                                },
+                                                onClick = {
+                                                    focusManager.clearFocus()
+                                                    showTopMenu = false
+                                                    scope.launch { drawerState.open() }
+                                                }
+                                            )
+                                            DropdownMenuItem(
+                                                text = { Text("Download Context") },
+                                                leadingIcon = {
+                                                    Icon(
+                                                        Icons.Default.Download,
+                                                        contentDescription = null
+                                                    )
+                                                },
+                                                onClick = {
+                                                    focusManager.clearFocus()
+                                                    showTopMenu = false
+                                                    viewModel.downloadChatContext(context)
+                                                }
+                                            )
+                                            DropdownMenuItem(
+                                                text = { Text("Settings & Personas") },
+                                                leadingIcon = {
+                                                    Icon(
+                                                        Icons.Default.Settings,
+                                                        contentDescription = null
+                                                    )
+                                                },
+                                                onClick = {
+                                                    focusManager.clearFocus()
+                                                    showTopMenu = false
+                                                    viewModel.toggleAdminMode()
+                                                }
+                                            )
+                                        }
+                                    }
                                 }
                             }
                         },
@@ -307,7 +427,6 @@ fun ChatScreen(
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(top = innerPadding.calculateTopPadding())
                         .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom))
                 ) {
                     // Chat Messages Body or Empty State
@@ -315,21 +434,37 @@ fun ChatScreen(
                         modifier = Modifier
                             .weight(1f)
                             .fillMaxWidth()
+                            .pointerInput(Unit) {
+                                detectTapGestures(onTap = {
+                                    focusManager.clearFocus()
+                                })
+                            }
                     ) {
                         if (messages.isEmpty()) {
-                            EmptyChatState(
-                                selectedPersona = selectedPersona,
-                                onPromptSelected = { prompt ->
-                                    inputText = prompt
-                                    viewModel.sendMessage(prompt)
-                                    inputText = ""
-                                }
-                            )
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(top = innerPadding.calculateTopPadding())
+                            ) {
+                                EmptyChatState(
+                                    selectedPersona = selectedPersona,
+                                    onPromptSelected = { prompt ->
+                                        inputText = prompt
+                                        viewModel.sendMessage(prompt)
+                                        inputText = ""
+                                    }
+                                )
+                            }
                         } else {
                             LazyColumn(
                                 state = listState,
                                 modifier = Modifier.fillMaxSize(),
-                                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                                contentPadding = PaddingValues(
+                                    top = innerPadding.calculateTopPadding() + 8.dp,
+                                    bottom = 16.dp,
+                                    start = 16.dp,
+                                    end = 16.dp
+                                ),
                                 verticalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
                                 items(messages, key = { it.id }) { msg ->
@@ -347,6 +482,18 @@ fun ChatScreen(
                                         TypingIndicatorBubble(
                                             personaDisplayName = selectedPersona?.displayName ?: "Assistant"
                                         )
+                                    }
+                                } else {
+                                    val lastMsg = messages.lastOrNull()
+                                    if (lastMsg != null && lastMsg.role == "assistant") {
+                                        item {
+                                            com.example.ui.components.FollowUpSuggestionChips(
+                                                lastAssistantText = lastMsg.content,
+                                                onSuggestionClick = { prompt ->
+                                                    viewModel.sendMessage(prompt)
+                                                }
+                                            )
+                                        }
                                     }
                                 }
                             }
@@ -383,6 +530,7 @@ fun ChatScreen(
             }
         }
     }
+}
 }
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -458,7 +606,9 @@ fun EmptyChatState(
                             MaterialTheme.colorScheme.outline.copy(alpha = 0.2f),
                             RoundedCornerShape(20.dp)
                         )
-                        .clickable { onPromptSelected(prompt) }
+                        .clickable {
+                            onPromptSelected(prompt)
+                        }
                 ) {
                     Row(
                         modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
@@ -502,15 +652,11 @@ fun ChatInputBar(
     val isImeVisible = WindowInsets.isImeVisible
     var isFocused by remember { mutableStateOf(false) }
 
-    androidx.compose.material3.Surface(
-        color = Color.Transparent,
-        modifier = Modifier.fillMaxWidth()
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 8.dp, vertical = 6.dp)
     ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 8.dp, vertical = 6.dp)
-        ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
@@ -525,7 +671,7 @@ fun ChatInputBar(
                 modifier = Modifier.padding(end = 6.dp)
             )
 
-            // Text Input Field (Middle) with keyboard toggle on tap
+            // Text Input Field (Middle)
             OutlinedTextField(
                 value = inputText,
                 onValueChange = onInputTextChange,
@@ -535,17 +681,6 @@ fun ChatInputBar(
                     .focusRequester(focusRequester)
                     .onFocusChanged { focusState ->
                         isFocused = focusState.isFocused
-                    }
-                    .pointerInput(isImeVisible, isFocused) {
-                        detectTapGestures {
-                            if (isImeVisible || isFocused) {
-                                keyboardController?.hide()
-                                focusManager.clearFocus()
-                            } else {
-                                focusRequester.requestFocus()
-                                keyboardController?.show()
-                            }
-                        }
                     }
                     .testTag("chat_input_field"),
                 shape = RoundedCornerShape(24.dp),
@@ -562,7 +697,10 @@ fun ChatInputBar(
 
             // Voice Microphone Input
             IconButton(
-                onClick = onVoiceInputClick,
+                onClick = {
+                    focusManager.clearFocus()
+                    onVoiceInputClick()
+                },
                 modifier = Modifier.size(38.dp)
             ) {
                 Icon(
@@ -584,7 +722,10 @@ fun ChatInputBar(
                         if (inputText.isNotBlank() && !isGenerating) MaterialTheme.colorScheme.primary
                         else MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)
                     )
-                    .clickable(enabled = inputText.isNotBlank() && !isGenerating) { onSendClick() }
+                    .clickable(enabled = inputText.isNotBlank() && !isGenerating) {
+                        focusManager.clearFocus()
+                        onSendClick()
+                    }
                     .testTag("send_message_button"),
                 contentAlignment = Alignment.Center
             ) {
@@ -605,7 +746,6 @@ fun ChatInputBar(
             }
         }
     }
-}
 }
 
 private fun String?.isNull_or_blank_custom(): Boolean = this == null || this.trim().isEmpty()

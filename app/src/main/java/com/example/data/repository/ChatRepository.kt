@@ -162,6 +162,14 @@ class ChatRepository(
         chatDao.deleteSession(sessionId)
     }
 
+    suspend fun togglePinSession(sessionId: String, currentPin: Boolean) {
+        chatDao.updateSessionPin(sessionId, !currentPin)
+    }
+
+    suspend fun renameSession(sessionId: String, newTitle: String) {
+        chatDao.updateSessionTitle(sessionId, newTitle)
+    }
+
     suspend fun clearAllHistory() {
         chatDao.deleteAllSessions()
     }

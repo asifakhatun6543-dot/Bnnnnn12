@@ -11,6 +11,7 @@ data class ChatSessionEntity(
     val title: String = "New Chat",
     val personaId: Long = 0,
     val personaDisplayName: String = "AI Assistant",
+    val isPinned: Boolean = false,
     val createdAt: Long = System.currentTimeMillis(),
     val updatedAt: Long = System.currentTimeMillis()
 )

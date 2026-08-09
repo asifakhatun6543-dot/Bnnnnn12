@@ -42,6 +42,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -59,6 +61,8 @@ fun PersonaSelector(
     isCompact: Boolean = false
 ) {
     var expanded by remember { mutableStateOf(false) }
+    val keyboardController = LocalSoftwareKeyboardController.current
+    val focusManager = LocalFocusManager.current
 
     Box(modifier = modifier) {
         // Model Pill Selector Header
@@ -67,7 +71,10 @@ fun PersonaSelector(
                 modifier = Modifier
                     .size(40.dp)
                     .clip(CircleShape)
-                    .clickable { expanded = true }
+                    .clickable {
+                        focusManager.clearFocus()
+                        expanded = true
+                    }
                     .border(
                         width = 1.dp,
                         color = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
@@ -107,7 +114,10 @@ fun PersonaSelector(
             Surface(
                 modifier = Modifier
                     .clip(RoundedCornerShape(18.dp))
-                    .clickable { expanded = true }
+                    .clickable {
+                        focusManager.clearFocus()
+                        expanded = true
+                    }
                     .border(
                         width = 1.dp,
                         color = MaterialTheme.colorScheme.primary.copy(alpha = 0.4f),
@@ -193,7 +203,7 @@ fun PersonaSelector(
             expanded = expanded,
             onDismissRequest = { expanded = false },
             modifier = Modifier
-                .width(280.dp)
+                .width(220.dp)
                 .background(MaterialTheme.colorScheme.surface)
         ) {
             Text(
@@ -203,7 +213,7 @@ fun PersonaSelector(
                     letterSpacing = 1.sp
                 ),
                 color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
             )
 
             if (activePersonas.isEmpty()) {
@@ -229,14 +239,15 @@ fun PersonaSelector(
                                         imageVector = getPersonaIcon(persona.badgeText),
                                         contentDescription = null,
                                         tint = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                                        modifier = Modifier.size(18.dp)
+                                        modifier = Modifier.size(16.dp)
                                     )
-                                    Spacer(modifier = Modifier.width(10.dp))
+                                    Spacer(modifier = Modifier.width(8.dp))
                                     Column {
                                         Text(
                                             text = persona.displayName,
                                             style = MaterialTheme.typography.bodyMedium.copy(
-                                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                                fontSize = 13.sp
                                             ),
                                             color = MaterialTheme.colorScheme.onSurface,
                                             maxLines = 1,
@@ -245,7 +256,9 @@ fun PersonaSelector(
                                         if (persona.badgeText.isNotBlank()) {
                                             Text(
                                                 text = persona.badgeText,
-                                                style = MaterialTheme.typography.labelSmall,
+                                                style = MaterialTheme.typography.labelSmall.copy(
+                                                    fontSize = 10.sp
+                                                ),
                                                 color = MaterialTheme.colorScheme.secondary
                                             )
                                         }
@@ -257,45 +270,19 @@ fun PersonaSelector(
                                         imageVector = Icons.Default.Check,
                                         contentDescription = "Selected",
                                         tint = MaterialTheme.colorScheme.primary,
-                                        modifier = Modifier.size(18.dp)
+                                        modifier = Modifier.size(16.dp)
                                     )
                                 }
                             }
                         },
                         onClick = {
+                            focusManager.clearFocus()
                             onSelectPersona(persona)
                             expanded = false
                         }
                     )
                 }
             }
-
-            HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
-
-            DropdownMenuItem(
-                text = {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = Icons.Default.AdminPanelSettings,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.tertiary,
-                            modifier = Modifier.size(20.dp)
-                        )
-                        Spacer(modifier = Modifier.width(10.dp))
-                        Text(
-                            text = "Admin Settings & Providers",
-                            style = MaterialTheme.typography.bodyMedium.copy(
-                                fontWeight = FontWeight.SemiBold
-                            ),
-                            color = MaterialTheme.colorScheme.tertiary
-                        )
-                    }
-                },
-                onClick = {
-                    expanded = false
-                    onOpenAdmin()
-                }
-            )
         }
     }
 }
