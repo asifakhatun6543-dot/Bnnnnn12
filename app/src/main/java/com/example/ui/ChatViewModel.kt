@@ -74,6 +74,9 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     private val _isProfileSettingsOpen = MutableStateFlow(false)
     val isProfileSettingsOpen: StateFlow<Boolean> = _isProfileSettingsOpen.asStateFlow()
 
+    private val _isCustomPageOpen = MutableStateFlow(false)
+    val isCustomPageOpen: StateFlow<Boolean> = _isCustomPageOpen.asStateFlow()
+
     private val _selectedAccentColorIndex = MutableStateFlow(0)
     val selectedAccentColorIndex: StateFlow<Int> = _selectedAccentColorIndex.asStateFlow()
 
@@ -120,6 +123,14 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
 
     fun closeProfileSettings() {
         _isProfileSettingsOpen.value = false
+    }
+
+    fun openCustomPage() {
+        _isCustomPageOpen.value = true
+    }
+
+    fun closeCustomPage() {
+        _isCustomPageOpen.value = false
     }
 
     fun selectAccentColor(index: Int) {

@@ -5,6 +5,9 @@ import android.content.Intent
 import android.speech.RecognizerIntent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateContentSize
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -36,14 +39,23 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AdminPanelSettings
+import androidx.compose.material.icons.filled.ArrowUpward
+import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.Brush
+import androidx.compose.material.icons.filled.CameraAlt
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Code
+import androidx.compose.material.icons.filled.ContentCut
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.GraphicEq
+import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Lightbulb
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Mic
@@ -96,8 +108,10 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.data.model.PersonaEntity
 import com.example.ui.components.ChatBubble
@@ -168,6 +182,7 @@ fun ChatScreen(
     val isGenerating by viewModel.isGenerating.collectAsStateWithLifecycle()
     val isAdminMode by viewModel.isAdminMode.collectAsStateWithLifecycle()
     val isProfileSettingsOpen by viewModel.isProfileSettingsOpen.collectAsStateWithLifecycle()
+    val isCustomPageOpen by viewModel.isCustomPageOpen.collectAsStateWithLifecycle()
     val selectedAccentColorIndex by viewModel.selectedAccentColorIndex.collectAsStateWithLifecycle()
     val themeMode by viewModel.themeMode.collectAsStateWithLifecycle()
     val isDarkMode by viewModel.isDarkMode.collectAsStateWithLifecycle()
@@ -235,7 +250,15 @@ fun ChatScreen(
             onSetThemeMode = viewModel::setThemeMode,
             isDarkMode = isDarkMode,
             onToggleDarkMode = viewModel::toggleDarkMode,
-            onSubmitReport = viewModel::submitReport
+            onSubmitReport = viewModel::submitReport,
+            onOpenCustomPage = {
+                viewModel.closeProfileSettings()
+                viewModel.openCustomPage()
+            }
+        )
+    } else if (isCustomPageOpen) {
+        CustomBlankPageScreen(
+            onClose = viewModel::closeCustomPage
         )
     } else {
         val isDrawerOpen = drawerState.isOpen || drawerState.isAnimationRunning
@@ -270,7 +293,11 @@ fun ChatScreen(
                             viewModel.openProfileSettings()
                             scope.launch { drawerState.close() }
                         },
-                        onClearAllHistory = viewModel::clearAllHistory
+                        onClearAllHistory = viewModel::clearAllHistory,
+                        onOpenCustomPage = {
+                            viewModel.openCustomPage()
+                            scope.launch { drawerState.close() }
+                        }
                     )
                 }
             }
@@ -289,7 +316,18 @@ fun ChatScreen(
                 Scaffold(
                 topBar = {
                     TopAppBar(
-                        title = {},
+                        title = {
+                            Text(
+                                text = selectedPersona?.displayName ?: "OmniChat",
+                                style = MaterialTheme.typography.titleMedium.copy(
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 18.sp
+                                ),
+                                color = MaterialTheme.colorScheme.onSurface,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        },
                         navigationIcon = {
                             Surface(
                                 shape = CircleShape,
@@ -319,9 +357,10 @@ fun ChatScreen(
                             ) {
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(2.dp),
                                     modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
                                 ) {
-                                     // ChatGPT style New Chat icon
+                                    // 1. ChatGPT style New Chat icon
                                     IconButton(
                                         onClick = {
                                             focusManager.clearFocus()
@@ -335,7 +374,17 @@ fun ChatScreen(
                                             tint = MaterialTheme.colorScheme.onSurface
                                         )
                                     }
-                                    // Three vertical dots icon
+
+                                    // 2. Model selector icon (compact size matching new chat icon)
+                                    PersonaSelector(
+                                        selectedPersona = selectedPersona,
+                                        activePersonas = activePersonas,
+                                        onSelectPersona = viewModel::selectPersona,
+                                        onOpenAdmin = viewModel::toggleAdminMode,
+                                        isCompact = true
+                                    )
+
+                                    // 3. Three vertical dots icon
                                     Box {
                                         IconButton(
                                             onClick = {
@@ -505,9 +554,14 @@ fun ChatScreen(
                         inputText = inputText,
                         onInputTextChange = { inputText = it },
                         isGenerating = isGenerating,
-                        onSendClick = {
-                            if (inputText.isNotBlank()) {
-                                viewModel.sendMessage(inputText)
+                        onSendClick = { attachment ->
+                            val fullPrompt = if (attachment != null) {
+                                if (inputText.isBlank()) "[Attached: $attachment]" else "$inputText [Attached: $attachment]"
+                            } else {
+                                inputText
+                            }
+                            if (fullPrompt.isNotBlank()) {
+                                viewModel.sendMessage(fullPrompt)
                                 inputText = ""
                             }
                         },
@@ -520,11 +574,7 @@ fun ChatScreen(
                             try {
                                 speechLauncher.launch(intent)
                             } catch (_: Exception) {}
-                        },
-                        selectedPersona = selectedPersona,
-                        activePersonas = activePersonas,
-                        onSelectPersona = viewModel::selectPersona,
-                        onOpenAdmin = viewModel::toggleAdminMode
+                        }
                     )
                 }
             }
@@ -639,109 +689,355 @@ fun ChatInputBar(
     inputText: String,
     onInputTextChange: (String) -> Unit,
     isGenerating: Boolean,
-    onSendClick: () -> Unit,
-    onVoiceInputClick: () -> Unit,
-    selectedPersona: PersonaEntity?,
-    activePersonas: List<PersonaEntity>,
-    onSelectPersona: (PersonaEntity) -> Unit,
-    onOpenAdmin: () -> Unit
+    onSendClick: (String?) -> Unit,
+    onVoiceInputClick: () -> Unit
 ) {
-    val keyboardController = LocalSoftwareKeyboardController.current
     val focusManager = LocalFocusManager.current
     val focusRequester = remember { FocusRequester() }
-    val isImeVisible = WindowInsets.isImeVisible
     var isFocused by remember { mutableStateOf(false) }
+    var showPlusMenu by remember { mutableStateOf(false) }
+    var attachedFile by remember { mutableStateOf<String?>(null) }
+    var previewFile by remember { mutableStateOf<String?>(null) }
+
+    // Attachment Full View Dialog Modal
+    if (previewFile != null) {
+        Dialog(onDismissRequest = { previewFile = null }) {
+            Surface(
+                shape = RoundedCornerShape(22.dp),
+                color = MaterialTheme.colorScheme.surface,
+                tonalElevation = 8.dp,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp)
+            ) {
+                Column(
+                    modifier = Modifier.padding(18.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Attachment Preview",
+                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        IconButton(onClick = { previewFile = null }) {
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = "Close preview",
+                                tint = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(220.dp)
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.65f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center,
+                            modifier = Modifier.padding(12.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Image,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(64.dp)
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                text = previewFile ?: "",
+                                style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold),
+                                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    Surface(
+                        shape = RoundedCornerShape(14.dp),
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { previewFile = null }
+                    ) {
+                        Box(
+                            modifier = Modifier.padding(vertical = 12.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "Done",
+                                style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
+                                color = MaterialTheme.colorScheme.onPrimary
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
 
     Box(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 8.dp, vertical = 6.dp)
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
+        // Main Input Container Card
+        Surface(
+            shape = RoundedCornerShape(26.dp),
+            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+            border = BorderStroke(
+                width = 1.dp,
+                color = if (isFocused) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+            ),
+            modifier = Modifier.fillMaxWidth()
         ) {
-            // 40dp Width AI Selector Button (Left)
-            PersonaSelector(
-                selectedPersona = selectedPersona,
-                activePersonas = activePersonas,
-                onSelectPersona = onSelectPersona,
-                onOpenAdmin = onOpenAdmin,
-                isCompact = true,
-                modifier = Modifier.padding(end = 6.dp)
-            )
-
-            // Text Input Field (Middle)
-            OutlinedTextField(
-                value = inputText,
-                onValueChange = onInputTextChange,
-                placeholder = { Text("Message...", fontSize = 13.sp) },
-                modifier = Modifier
-                    .weight(1f)
-                    .focusRequester(focusRequester)
-                    .onFocusChanged { focusState ->
-                        isFocused = focusState.isFocused
-                    }
-                    .testTag("chat_input_field"),
-                shape = RoundedCornerShape(24.dp),
-                maxLines = 4,
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = MaterialTheme.colorScheme.primary,
-                    unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
-                    focusedContainerColor = Color.Transparent,
-                    unfocusedContainerColor = Color.Transparent
-                )
-            )
-
-            Spacer(modifier = Modifier.width(4.dp))
-
-            // Voice Microphone Input
-            IconButton(
-                onClick = {
-                    focusManager.clearFocus()
-                    onVoiceInputClick()
-                },
-                modifier = Modifier.size(38.dp)
+            Column(
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)
             ) {
-                Icon(
-                    imageVector = Icons.Default.Mic,
-                    contentDescription = "Voice Input",
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(20.dp)
-                )
-            }
+                // Image/File Attachment Preview Thumbnail inside Container
+                if (attachedFile != null) {
+                    Box(
+                        modifier = Modifier
+                            .padding(bottom = 8.dp)
+                            .size(width = 110.dp, height = 100.dp)
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.75f))
+                            .clickable { previewFile = attachedFile }
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(8.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Image,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                modifier = Modifier.size(36.dp)
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = attachedFile ?: "Photo",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
 
-            Spacer(modifier = Modifier.width(2.dp))
-
-            // Send Button
-            Box(
-                modifier = Modifier
-                    .size(40.dp)
-                    .clip(CircleShape)
-                    .background(
-                        if (inputText.isNotBlank() && !isGenerating) MaterialTheme.colorScheme.primary
-                        else MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)
-                    )
-                    .clickable(enabled = inputText.isNotBlank() && !isGenerating) {
-                        focusManager.clearFocus()
-                        onSendClick()
+                        // Close (X) button on top-right of image thumbnail
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.TopEnd)
+                                .padding(4.dp)
+                                .size(22.dp)
+                                .clip(CircleShape)
+                                .background(Color.Black.copy(alpha = 0.65f))
+                                .clickable { attachedFile = null },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = "Remove attachment",
+                                tint = Color.White,
+                                modifier = Modifier.size(13.dp)
+                            )
+                        }
                     }
-                    .testTag("send_message_button"),
-                contentAlignment = Alignment.Center
-            ) {
-                if (isGenerating) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(18.dp),
-                        color = Color.White,
-                        strokeWidth = 2.dp
-                    )
-                } else {
-                    Icon(
-                        imageVector = Icons.Default.Send,
-                        contentDescription = "Send Message",
-                        tint = Color.White,
-                        modifier = Modifier.size(16.dp)
-                    )
+                }
+
+                // Middle Multiline Text Field with "Ask anything..." placeholder
+                BasicTextField(
+                    value = inputText,
+                    onValueChange = onInputTextChange,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 4.dp, vertical = 4.dp)
+                        .focusRequester(focusRequester)
+                        .onFocusChanged { focusState ->
+                            isFocused = focusState.isFocused
+                        }
+                        .testTag("chat_input_field"),
+                    textStyle = MaterialTheme.typography.bodyMedium.copy(
+                        color = MaterialTheme.colorScheme.onSurface,
+                        fontSize = 15.sp,
+                        lineHeight = 20.sp
+                    ),
+                    cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                    maxLines = 5,
+                    decorationBox = { innerTextField ->
+                        if (inputText.isEmpty() && attachedFile == null) {
+                            Text(
+                                text = "Ask anything...",
+                                style = MaterialTheme.typography.bodyMedium.copy(fontSize = 15.sp),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.65f)
+                            )
+                        } else if (inputText.isEmpty() && attachedFile != null) {
+                            Text(
+                                text = "Ask about this photo...",
+                                style = MaterialTheme.typography.bodyMedium.copy(fontSize = 15.sp),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.65f)
+                            )
+                        }
+                        innerTextField()
+                    }
+                )
+
+                Spacer(modifier = Modifier.height(6.dp))
+
+                // Bottom straight horizontal row: Plus (+) Icon on Left, Mic & Single Action/Send Button on Right
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    // Far Left: Plus (+) Icon Button
+                    Box {
+                        IconButton(
+                            onClick = { showPlusMenu = true },
+                            modifier = Modifier.size(32.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Add,
+                                contentDescription = "Add options",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(22.dp)
+                            )
+                        }
+
+                        DropdownMenu(
+                            expanded = showPlusMenu,
+                            onDismissRequest = { showPlusMenu = false }
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text("Camera") },
+                                leadingIcon = {
+                                    Icon(Icons.Default.CameraAlt, contentDescription = null)
+                                },
+                                onClick = {
+                                    showPlusMenu = false
+                                    attachedFile = "Camera_Photo.jpg"
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Upload Photo") },
+                                leadingIcon = {
+                                    Icon(Icons.Default.Image, contentDescription = null)
+                                },
+                                onClick = {
+                                    showPlusMenu = false
+                                    attachedFile = "Photo_Attachment.jpg"
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Upload File") },
+                                leadingIcon = {
+                                    Icon(Icons.Default.AttachFile, contentDescription = null)
+                                },
+                                onClick = {
+                                    showPlusMenu = false
+                                    attachedFile = "Document.pdf"
+                                }
+                            )
+                        }
+                    }
+
+                    // Far Right: Microphone Icon & Single Dynamic Action (GraphicEq / Send) Button
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        // Microphone button
+                        IconButton(
+                            onClick = {
+                                focusManager.clearFocus()
+                                onVoiceInputClick()
+                            },
+                            modifier = Modifier.size(32.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Mic,
+                                contentDescription = "Voice Input",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+
+                        // Single Dynamic Button: GraphicEq when empty, Send button when text/file present
+                        val isUserTypingOrAttached = inputText.isNotBlank() || attachedFile != null
+
+                        if (!isUserTypingOrAttached) {
+                            // GraphicEq (Live Voice Mode) button
+                            Box(
+                                modifier = Modifier
+                                    .size(34.dp)
+                                    .clip(CircleShape)
+                                    .background(MaterialTheme.colorScheme.primaryContainer)
+                                    .clickable {
+                                        focusManager.clearFocus()
+                                        onVoiceInputClick()
+                                    },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.GraphicEq,
+                                    contentDescription = "Live Voice Mode",
+                                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                        } else {
+                            // Send Button
+                            val canSend = !isGenerating
+                            Box(
+                                modifier = Modifier
+                                    .size(34.dp)
+                                    .clip(CircleShape)
+                                    .background(
+                                        if (canSend) MaterialTheme.colorScheme.primary
+                                        else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f)
+                                    )
+                                    .clickable(enabled = canSend) {
+                                        focusManager.clearFocus()
+                                        onSendClick(attachedFile)
+                                        attachedFile = null
+                                    }
+                                    .testTag("send_message_button"),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                if (isGenerating) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(16.dp),
+                                        color = Color.White,
+                                        strokeWidth = 2.dp
+                                    )
+                                } else {
+                                    Icon(
+                                        imageVector = Icons.Default.ArrowUpward,
+                                        contentDescription = "Send Message",
+                                        tint = if (canSend) Color.White else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
