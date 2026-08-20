@@ -532,18 +532,6 @@ fun ChatScreen(
                                             personaDisplayName = selectedPersona?.displayName ?: "Assistant"
                                         )
                                     }
-                                } else {
-                                    val lastMsg = messages.lastOrNull()
-                                    if (lastMsg != null && lastMsg.role == "assistant") {
-                                        item {
-                                            com.example.ui.components.FollowUpSuggestionChips(
-                                                lastAssistantText = lastMsg.content,
-                                                onSuggestionClick = { prompt ->
-                                                    viewModel.sendMessage(prompt)
-                                                }
-                                            )
-                                        }
-                                    }
                                 }
                             }
                         }
@@ -623,63 +611,8 @@ fun EmptyChatState(
             text = "Ask me anything. Powered by custom AI persona models.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(top = 6.dp, bottom = 24.dp)
+            modifier = Modifier.padding(top = 6.dp)
         )
-
-        Text(
-            text = "TRY ASKING:",
-            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, letterSpacing = 1.sp),
-            color = MaterialTheme.colorScheme.outline,
-            modifier = Modifier.padding(bottom = 12.dp)
-        )
-
-        val samplePrompts = listOf(
-            "Write a Kotlin Coroutines helper function",
-            "Draft a professional project launch email",
-            "Explain Quantum Computing in simple terms",
-            "Brainstorm 5 innovative startup ideas"
-        )
-
-        FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            samplePrompts.forEach { prompt ->
-                Surface(
-                    shape = RoundedCornerShape(20.dp),
-                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f),
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(20.dp))
-                        .border(
-                            1.dp,
-                            MaterialTheme.colorScheme.outline.copy(alpha = 0.2f),
-                            RoundedCornerShape(20.dp)
-                        )
-                        .clickable {
-                            onPromptSelected(prompt)
-                        }
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.AutoAwesome,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(14.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = prompt,
-                            style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium),
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-            }
-        }
     }
 }
 

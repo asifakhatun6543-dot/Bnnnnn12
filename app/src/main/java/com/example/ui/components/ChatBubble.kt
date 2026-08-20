@@ -285,25 +285,28 @@ fun ChatBubble(
                                 val popupWidth = popupContentSize.width
                                 val popupHeight = popupContentSize.height
 
-                                // Normalize coordinates whether rect is in Window or Local space
-                                val selectionLocalTop = if (rect.top >= anchorBounds.top) (rect.top - anchorBounds.top) else rect.top
-                                val selectionLocalBottom = if (rect.bottom >= anchorBounds.top) (rect.bottom - anchorBounds.top) else rect.bottom
-                                val selectionLocalLeft = if (rect.left >= anchorBounds.left) (rect.left - anchorBounds.left) else rect.left
-                                val selectionLocalRight = if (rect.right >= anchorBounds.left) (rect.right - anchorBounds.left) else rect.right
+                                // 1. Horizontal center of selected text in Window coordinates
+                                val selectionCenterXWindow = (rect.left + rect.right) / 2f
+                                val targetWindowX = selectionCenterXWindow - (popupWidth / 2f)
+                                val clampedWindowX = targetWindowX.coerceIn(
+                                    16f,
+                                    (windowSize.width - popupWidth - 16f).coerceAtLeast(16f)
+                                )
 
-                                val localCenterX = (selectionLocalLeft + selectionLocalRight) / 2f
-                                val targetLocalX = localCenterX - popupWidth / 2f
-                                val clampedLocalX = targetLocalX.coerceIn(8f, (anchorBounds.width - popupWidth - 8).toFloat().coerceAtLeast(8f))
+                                // 2. Vertical position in Window coordinates
+                                // Try placing 10px above top of selected text
+                                var targetWindowY = rect.top - popupHeight - 10f
 
-                                // Position directly above selectionLocalTop
-                                var targetLocalY = selectionLocalTop - popupHeight - 12f
-
-                                // If target Y goes above anchor top, place below selectionLocalBottom
-                                if (targetLocalY < 8f) {
-                                    targetLocalY = selectionLocalBottom + 12f
+                                // If placing above puts it behind top app bar (< 120px from top of screen), place below selected text
+                                if (targetWindowY < 120f) {
+                                    targetWindowY = rect.bottom + 10f
                                 }
 
-                                return IntOffset(clampedLocalX.toInt(), targetLocalY.toInt())
+                                // 3. Convert Window space position to Anchor-relative local offset
+                                val localX = clampedWindowX - anchorBounds.left
+                                val localY = targetWindowY - anchorBounds.top
+
+                                return IntOffset(localX.toInt(), localY.toInt())
                             }
                         }
                     },

@@ -203,22 +203,23 @@ fun PersonaSelector(
             expanded = expanded,
             onDismissRequest = { expanded = false },
             modifier = Modifier
-                .width(220.dp)
+                .width(170.dp)
                 .background(MaterialTheme.colorScheme.surface)
         ) {
             Text(
-                text = "AVAILABLE ASSISTANTS",
+                text = "MODELS",
                 style = MaterialTheme.typography.labelSmall.copy(
                     fontWeight = FontWeight.Bold,
-                    letterSpacing = 1.sp
+                    fontSize = 10.sp,
+                    letterSpacing = 0.8.sp
                 ),
                 color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
             )
 
             if (activePersonas.isEmpty()) {
                 DropdownMenuItem(
-                    text = { Text("No active personas configured") },
+                    text = { Text("No models available", fontSize = 12.sp) },
                     onClick = { expanded = false }
                 )
             } else {
@@ -239,15 +240,15 @@ fun PersonaSelector(
                                         imageVector = getPersonaIcon(persona.badgeText),
                                         contentDescription = null,
                                         tint = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                                        modifier = Modifier.size(16.dp)
+                                        modifier = Modifier.size(14.dp)
                                     )
-                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Spacer(modifier = Modifier.width(6.dp))
                                     Column {
                                         Text(
                                             text = persona.displayName,
                                             style = MaterialTheme.typography.bodyMedium.copy(
-                                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                                fontSize = 13.sp
+                                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                                fontSize = 12.sp
                                             ),
                                             color = MaterialTheme.colorScheme.onSurface,
                                             maxLines = 1,
@@ -257,7 +258,7 @@ fun PersonaSelector(
                                             Text(
                                                 text = persona.badgeText,
                                                 style = MaterialTheme.typography.labelSmall.copy(
-                                                    fontSize = 10.sp
+                                                    fontSize = 9.sp
                                                 ),
                                                 color = MaterialTheme.colorScheme.secondary
                                             )
@@ -270,7 +271,7 @@ fun PersonaSelector(
                                         imageVector = Icons.Default.Check,
                                         contentDescription = "Selected",
                                         tint = MaterialTheme.colorScheme.primary,
-                                        modifier = Modifier.size(16.dp)
+                                        modifier = Modifier.size(14.dp)
                                     )
                                 }
                             }

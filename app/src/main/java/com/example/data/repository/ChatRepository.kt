@@ -21,63 +21,61 @@ class ChatRepository(
     val allSessions: Flow<List<ChatSessionEntity>> = chatDao.getAllSessions()
 
     suspend fun ensureDefaultPersonasInitialized() {
-        if (personaDao.getPersonaCount() == 0) {
-            val defaults = listOf(
-                PersonaEntity(
-                    id = 1,
-                    displayName = "Omni AI Assistant",
-                    providerType = ProviderType.GEMINI.name,
-                    apiKey = "",
-                    modelVersion = "gemini-2.5-flash",
-                    systemPrompt = "You are Omni AI, a versatile, highly intelligent, and friendly assistant capable of handling writing, coding, math, and creative problem solving.",
-                    temperature = 0.7f,
-                    maxTokens = 2048,
-                    badgeText = "Recommended",
-                    isActive = true,
-                    isDefault = true
-                ),
-                PersonaEntity(
-                    id = 2,
-                    displayName = "Code & Logic Specialist",
-                    providerType = ProviderType.CLAUDE.name,
-                    apiKey = "",
-                    modelVersion = "claude-3-5-sonnet-20241022",
-                    systemPrompt = "You are an elite software architecture expert. You write clean, robust, and idiomatic Kotlin and Android Jetpack Compose code with concise explanations.",
-                    temperature = 0.2f,
-                    maxTokens = 4096,
-                    badgeText = "Coding Pro",
-                    isActive = true,
-                    isDefault = false
-                ),
-                PersonaEntity(
-                    id = 3,
-                    displayName = "Fast Brainstormer & Writer",
-                    providerType = ProviderType.MISTRAL.name,
-                    apiKey = "",
-                    modelVersion = "mistral-large-latest",
-                    systemPrompt = "You are a creative writer and business brainstormer. Produce inspiring, elegant, structured outlines and draft proposals with maximum speed and clarity.",
-                    temperature = 0.8f,
-                    maxTokens = 2048,
-                    badgeText = "Fast & Creative",
-                    isActive = true,
-                    isDefault = false
-                ),
-                PersonaEntity(
-                    id = 4,
-                    displayName = "Deep Reasoner Engine",
-                    providerType = ProviderType.OPENAI.name,
-                    apiKey = "",
-                    modelVersion = "gpt-4o-mini",
-                    systemPrompt = "You are a rigorous analytical engine. Break down complex multi-step technical or logical queries into clear bullet points and structured analysis.",
-                    temperature = 0.5f,
-                    maxTokens = 2048,
-                    badgeText = "Deep Logic",
-                    isActive = true,
-                    isDefault = false
-                )
+        val defaults = listOf(
+            PersonaEntity(
+                id = 1,
+                displayName = "Omni-1.2",
+                providerType = ProviderType.GEMINI.name,
+                apiKey = "",
+                modelVersion = "gemini-2.5-flash",
+                systemPrompt = "You are Omni-1.2, a fast and smart general AI assistant.",
+                temperature = 0.7f,
+                maxTokens = 2048,
+                badgeText = "Fast",
+                isActive = true,
+                isDefault = true
+            ),
+            PersonaEntity(
+                id = 2,
+                displayName = "Omni-1.4",
+                providerType = ProviderType.CLAUDE.name,
+                apiKey = "",
+                modelVersion = "claude-3-5-sonnet-20241022",
+                systemPrompt = "You are Omni-1.4, specialized in writing clean code, logic, and structured problem solving.",
+                temperature = 0.2f,
+                maxTokens = 4096,
+                badgeText = "Coding",
+                isActive = true,
+                isDefault = false
+            ),
+            PersonaEntity(
+                id = 3,
+                displayName = "Omni-1.5",
+                providerType = ProviderType.MISTRAL.name,
+                apiKey = "",
+                modelVersion = "mistral-large-latest",
+                systemPrompt = "You are Omni-1.5, an advanced model for creative, high-speed writing and analysis.",
+                temperature = 0.8f,
+                maxTokens = 2048,
+                badgeText = "Creative",
+                isActive = true,
+                isDefault = false
+            ),
+            PersonaEntity(
+                id = 4,
+                displayName = "Omni-2",
+                providerType = ProviderType.OPENAI.name,
+                apiKey = "",
+                modelVersion = "gpt-4o-mini",
+                systemPrompt = "You are Omni-2, a flagship reasoning engine with deep technical intelligence.",
+                temperature = 0.5f,
+                maxTokens = 2048,
+                badgeText = "Logic Pro",
+                isActive = true,
+                isDefault = false
             )
-            personaDao.insertAll(defaults)
-        }
+        )
+        personaDao.insertAll(defaults)
     }
 
     fun getMessagesForSession(sessionId: String): Flow<List<ChatMessageEntity>> {
